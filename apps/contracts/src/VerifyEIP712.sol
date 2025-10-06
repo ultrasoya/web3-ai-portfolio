@@ -2,44 +2,53 @@
 pragma solidity ^0.8.0;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IUserProfile} from "./interfaces/IUserProfile.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {Structs} from "./shared/Structs.sol";
 
-contract VerifyEIP712 {
+contract VerifyEIP712 is EIP712 {
     using ECDSA for bytes32;
 
-    bytes32 private DOMAIN_SEPARATOR;
-    bytes32 private constant TRANSFER_TYPEHASH =
-        keccak256("Transfer(address from,address to,uint256 amount)");
+    struct Report {
+        address ownerReport;
+        uint64 createdAt;
+        uint8 reportType;
+        Structs.IpfsCID ipfsHash;
+    }
 
-    constructor(address _verifyingContract) {
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
-                keccak256(bytes("MyToken")),
-                keccak256(bytes("1")),
-                block.chainid,
-                _verifyingContract
-            )
+    bytes32 private constant _REPORT_TYPEHASH =
+        keccak256(
+            "Report(address ownerReport,uint64 createdAt,uint8 reportType,Structs.IpfsCID ipfsHash)"
         );
+
+    constructor() EIP712("ReportCreator", "1") {}
+
+    function _hashReport(
+        Report calldata report
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    _REPORT_TYPEHASH,
+                    report.ownerReport,
+                    report.createdAt,
+                    uint8(report.reportType),
+                    report.ipfsHash.hashDigest,
+                    report.ipfsHash.hashFunction,
+                    report.ipfsHash.size
+                )
+            );
     }
 
     function verify(
-        address _from,
-        address _to,
-        uint256 _amount,
-        bytes memory _signature
-    ) public view returns (bool) {
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                DOMAIN_SEPARATOR,
-                keccak256(abi.encode(TRANSFER_TYPEHASH, _from, _to, _amount))
-            )
-        );
-
-        address signer = digest.recover(_signature);
-        return signer == _from;
+        Report calldata report,
+        bytes calldata signature,
+        address expectedSigner
+    ) external view returns (bool) {
+        // digest по EIP-712
+        bytes32 digest = _hashTypedDataV4(_hashReport(report));
+        // восстанавливаем адрес подписанта
+        address signer = ECDSA.recover(digest, signature);
+        return signer == expectedSigner;
     }
 }

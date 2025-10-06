@@ -4,18 +4,21 @@ pragma solidity ^0.8.30;
 
 import {IUserProfile} from "./interfaces/IUserProfile.sol";
 import {IReportNFT} from "./interfaces/IReportNFT.sol";
+import {VerifyEIP712} from "./VerifyEIP712.sol";
+import {Structs} from "./shared/Structs.sol";
 
 contract ReportManager {
     struct Report {
         address ownerReport;
         uint64 createdAt;
         IUserProfile.PreferredReportType reportType;
-        bytes32 ipfsHash;
+        Structs.IpfsCID ipfsHash;
     }
 
-    IUserProfile immutable userProfile;
-    IReportNFT immutable reportNFT;
-    address public owner;
+    IUserProfile immutable i_userProfile;
+    IReportNFT immutable i_reportNFT;
+    VerifyEIP712 immutable i_verifyEIP712;
+    address public immutable i_owner;
     mapping(uint256 reportId => Report) public reports;
     mapping(address => bool) public authorizedBackends;
     uint256 public reportCount;
@@ -24,39 +27,66 @@ contract ReportManager {
         address ownerReport,
         uint256 indexed reportId,
         IUserProfile.PreferredReportType reportType,
-        bytes32 ipfsHash
+        Structs.IpfsCID ipfsHash
     );
 
-    error NotReportOwnerOrOwner();
     error NotRegistered();
+    error InvalidSignature();
+    error NotAuthorizedBackend();
+    error NotOwner();
 
-    modifier onlyReportOwnerOrOwner(uint256 reportId) {
-        if (
-            reports[reportId].ownerReport != msg.sender && msg.sender != owner
-        ) {
-            revert NotReportOwnerOrOwner();
+    modifier onlyOwner() {
+        if (msg.sender != i_owner) {
+            revert NotOwner();
+        }
+        _;
+    }
+
+    modifier onlyAuthorizedBackend() {
+        if (!authorizedBackends[msg.sender]) {
+            revert NotAuthorizedBackend();
         }
         _;
     }
 
     modifier onlyRegisteredUser(address ownerReport) {
-        if (!userProfile.checkUserRegistered(ownerReport)) {
+        if (!i_userProfile.checkUserRegistered(ownerReport)) {
             revert NotRegistered();
         }
         _;
     }
 
-    constructor(IUserProfile _userProfile, IReportNFT _reportNFT) {
-        userProfile = IUserProfile(_userProfile);
-        reportNFT = IReportNFT(_reportNFT);
-        owner = msg.sender;
+    constructor(
+        IUserProfile _userProfile,
+        IReportNFT _reportNFT,
+        VerifyEIP712 _verifyEIP712
+    ) {
+        i_userProfile = IUserProfile(_userProfile);
+        i_reportNFT = IReportNFT(_reportNFT);
+        i_verifyEIP712 = _verifyEIP712;
+        i_owner = msg.sender;
+    }
+
+    function createReportWithSignature(
+        VerifyEIP712.Report calldata report,
+        bytes calldata signature
+    ) external onlyRegisteredUser(report.ownerReport) onlyAuthorizedBackend {
+        if (!i_verifyEIP712.verify(report, signature, report.ownerReport)) {
+            revert InvalidSignature();
+        }
+
+        createReport(
+            IUserProfile.PreferredReportType(report.reportType),
+            report.ipfsHash,
+            report.ownerReport
+        );
     }
 
     function createReport(
         IUserProfile.PreferredReportType reportType,
-        bytes32 ipfsHash,
+        Structs.IpfsCID calldata ipfsHash,
         address ownerReport
-    ) external onlyRegisteredUser(ownerReport) {
+    ) public onlyRegisteredUser(ownerReport) {
         uint256 reportId = reportCount;
         reports[reportId] = Report(
             ownerReport,
@@ -65,14 +95,22 @@ contract ReportManager {
             ipfsHash
         );
 
-        userProfile.updateLastReportId(ownerReport, reportId);
+        i_userProfile.updateLastReportId(ownerReport, reportId);
 
         if (reportType == IUserProfile.PreferredReportType.NFT) {
-            reportNFT.mint(ownerReport, reportId, ipfsHash);
+            i_reportNFT.mint(ownerReport, reportId, ipfsHash.hashDigest);
         }
 
         emit ReportCreated(ownerReport, reportId, reportType, ipfsHash);
 
         reportCount++;
+    }
+
+    function addAuthorizedBackend(address backend) external onlyOwner {
+        authorizedBackends[backend] = true;
+    }
+
+    function removeAuthorizedBackend(address backend) external onlyOwner {
+        authorizedBackends[backend] = false;
     }
 }

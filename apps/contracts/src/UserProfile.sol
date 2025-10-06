@@ -23,6 +23,7 @@ contract UserProfile {
         PreferredReportType preferredReportType;
         FocusArea focusArea;
         uint lastReportId;
+        bool isActive;
     }
     /**
      * @notice Enumeration of available report formats
@@ -45,6 +46,9 @@ contract UserProfile {
 
     /// @notice Address of the contract owner who can update report IDs
     address public immutable i_owner;
+
+    /// @notice Address of the report manager who can update user profiles
+    address public reportManager;
 
     /// @notice Mapping from user addresses to their profile information
     mapping(address => User) public users;
@@ -103,12 +107,26 @@ contract UserProfile {
     /// @notice Thrown when a non-owner tries to call an owner-only function
     error NotOwner();
 
+    /// @notice Thrown when a non-authorized report manager tries to call an authorized report manager-only function
+    error NotAuthorizedReportManager();
+
+    /**
+     * @notice Modifier that ensures only the report manager can call the function
+     * @dev Reverts with NotAuthorizedReportManager if the caller is not the report manager
+     */
+    modifier onlyAuthorizedReportManager() {
+        if (msg.sender != reportManager) {
+            revert NotAuthorizedReportManager();
+        }
+        _;
+    }
+
     /**
      * @notice Modifier that ensures only unregistered users can call the function
      * @dev Reverts with AlreadyRegistered if the user is already registered
      */
     modifier onlyUnregisteredUser() {
-        if (users[msg.sender].registrationDate != 0) {
+        if (users[msg.sender].isActive) {
             revert AlreadyRegistered();
         }
         _;
@@ -119,7 +137,7 @@ contract UserProfile {
      * @dev Reverts with NotRegistered if the user is not registered
      */
     modifier onlyRegisteredUser() {
-        if (users[msg.sender].registrationDate == 0) {
+        if (!users[msg.sender].isActive) {
             revert NotRegistered();
         }
         _;
@@ -225,14 +243,14 @@ contract UserProfile {
      * @notice Updates the last report ID for a specific user
      * @param userAddress Address of the user to update
      * @param lastReportId ID of the most recent report generated for this user
-     * @dev Only the contract owner can call this function
-     * @dev Reverts if the user is not registered
+     * @dev Only the report manager can call this function
+     * @dev Reverts with NotRegistered if the user is not registered
      * @dev Emits LastReportIdUpdated event upon successful update
      */
     function updateLastReportId(
         address userAddress,
         uint lastReportId
-    ) public onlyOwner {
+    ) external onlyAuthorizedReportManager {
         if (users[userAddress].registrationDate == 0) {
             revert NotRegistered();
         }
@@ -245,5 +263,9 @@ contract UserProfile {
         address userAddress
     ) external view returns (bool) {
         return users[userAddress].registrationDate != 0;
+    }
+
+    function setReportManager(address _reportManager) external onlyOwner {
+        reportManager = _reportManager;
     }
 }
