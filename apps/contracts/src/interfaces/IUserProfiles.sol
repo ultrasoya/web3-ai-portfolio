@@ -5,10 +5,11 @@ pragma solidity ^0.8.30;
 interface IUserProfiles {
     struct User {
         string nickname;
-        uint64 registrationDate;
+        uint40 registrationDate;
         PreferredReportType preferredReportType;
         FocusArea focusArea;
         uint lastReportId;
+        bool isActive;
     }
 
     enum PreferredReportType {
@@ -38,7 +39,9 @@ interface IUserProfiles {
         address userAddress,
         uint lastReportId
     ) external;
-    function checkUserRegistered(
+    function checkUserRegisteredAndActive(
         address userAddress
     ) external view returns (bool);
+    function deactivateUser(address userAddress) external;
+    function activateUser(address userAddress) external;
 }

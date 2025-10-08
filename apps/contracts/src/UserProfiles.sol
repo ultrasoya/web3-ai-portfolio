@@ -105,7 +105,7 @@ contract UserProfiles {
     error AlreadyRegistered();
 
     /// @notice Thrown when an operation requires registration but user is not registered
-    error NotRegistered();
+    error NotRegisteredOrActive();
 
     /// @notice Thrown when a non-owner tries to call an owner-only function
     error NotOwner();
@@ -145,12 +145,12 @@ contract UserProfiles {
     }
 
     /**
-     * @notice Modifier that ensures only registered users can call the function
-     * @dev Reverts with NotRegistered if the user is not registered
+     * @notice Modifier that ensures only registered and active users can call the function
+     * @dev Reverts with NotRegisteredOrActive if the user is not registered or active
      */
-    modifier onlyRegisteredUser() {
+    modifier onlyRegisteredAndActiveUser() {
         if (!users[msg.sender].isActive) {
-            revert NotRegistered();
+            revert NotRegisteredOrActive();
         }
         _;
     }
@@ -235,7 +235,7 @@ contract UserProfiles {
      */
     function updatePreferredReportType(
         PreferredReportType preferredReportType
-    ) public onlyRegisteredUser {
+    ) public onlyRegisteredAndActiveUser {
         users[msg.sender].preferredReportType = preferredReportType;
 
         emit PreferredReportTypeUpdated(msg.sender, preferredReportType);
@@ -251,7 +251,7 @@ contract UserProfiles {
         string memory nickname
     )
         public
-        onlyRegisteredUser
+        onlyRegisteredAndActiveUser
         onlyUniqueNickname(nickname)
         onlyNonEmptyNickname(nickname)
     {
@@ -269,7 +269,9 @@ contract UserProfiles {
      * @dev Only registered users can call this function
      * @dev Emits FocusAreaUpdated event upon successful update
      */
-    function updateFocusArea(FocusArea focusArea) public onlyRegisteredUser {
+    function updateFocusArea(
+        FocusArea focusArea
+    ) public onlyRegisteredAndActiveUser {
         users[msg.sender].focusArea = focusArea;
 
         emit FocusAreaUpdated(msg.sender, focusArea);
@@ -280,15 +282,15 @@ contract UserProfiles {
      * @param userAddress Address of the user to update
      * @param lastReportId ID of the most recent report generated for this user
      * @dev Only the report manager can call this function
-     * @dev Reverts with NotRegistered if the user is not registered
+     * @dev Reverts with NotRegisteredOrActive if the user is not registered or active
      * @dev Emits LastReportIdUpdated event upon successful update
      */
     function updateLastReportId(
         address userAddress,
         uint lastReportId
     ) external onlyAuthorizedReportManager {
-        if (users[userAddress].registrationDate == 0) {
-            revert NotRegistered();
+        if (!users[userAddress].isActive) {
+            revert NotRegisteredOrActive();
         }
         users[userAddress].lastReportId = lastReportId;
 
@@ -313,7 +315,9 @@ contract UserProfiles {
      * @dev Only registered users can call this function
      * @dev Sets the user's isActive flag to false
      */
-    function deactivateUser(address userAddress) public onlyRegisteredUser {
+    function deactivateUser(
+        address userAddress
+    ) public onlyRegisteredAndActiveUser {
         if (msg.sender != userAddress) {
             revert NonUserCaller();
         }
@@ -326,7 +330,9 @@ contract UserProfiles {
      * @dev Only registered users can call this function
      * @dev Sets the user's isActive flag to true
      */
-    function activateUser(address userAddress) public onlyRegisteredUser {
+    function activateUser(
+        address userAddress
+    ) public onlyRegisteredAndActiveUser {
         if (msg.sender != userAddress) {
             revert NonUserCaller();
         }

@@ -29,7 +29,7 @@ contract ReportsManager {
     }
 
     /// @notice Address of the user profiles contract
-    IUserProfiles immutable i_userProfile;
+    IUserProfiles immutable i_userProfiles;
 
     /// @notice Address of the report NFT contract
     IReportNFT immutable i_reportNFT;
@@ -47,18 +47,18 @@ contract ReportsManager {
     mapping(address => bool) public authorizedBackends;
 
     /// @notice Total number of reports created
-    uint256 public reportCount;
+    uint256 public reportCount = 1;
 
     /**
      * @notice Emitted when a new report is created
-     * @param ownerReport Address of the report owner
      * @param reportId ID of the created report
+     * @param ownerReport Address of the report owner
      * @param reportType Type of the created report
      * @param ipfsHash IPFS hash of the report content
      */
     event ReportCreated(
-        address ownerReport,
         uint256 indexed reportId,
+        address ownerReport,
         IUserProfiles.PreferredReportType reportType,
         Structs.IpfsCID ipfsHash
     );
@@ -103,7 +103,7 @@ contract ReportsManager {
      * @dev Reverts with NotRegistered if the user is not registered
      */
     modifier onlyRegisteredUser(address ownerReport) {
-        if (!i_userProfile.checkUserRegistered(ownerReport)) {
+        if (!i_userProfiles.checkUserRegisteredAndActive(ownerReport)) {
             revert NotRegistered();
         }
         _;
@@ -111,17 +111,17 @@ contract ReportsManager {
 
     /**
      * @notice Constructor that initializes the contract with required dependencies
-     * @param _userProfile Address of the user profiles contract
+     * @param _userProfiles Address of the user profiles contract
      * @param _reportNFT Address of the report NFT contract
      * @param _verifyEIP712 Address of the EIP-712 verification contract
      * @dev Sets the deployer as the owner of the contract
      */
     constructor(
-        IUserProfiles _userProfile,
+        IUserProfiles _userProfiles,
         IReportNFT _reportNFT,
         VerifyEIP712 _verifyEIP712
     ) {
-        i_userProfile = IUserProfiles(_userProfile);
+        i_userProfiles = IUserProfiles(_userProfiles);
         i_reportNFT = IReportNFT(_reportNFT);
         i_verifyEIP712 = _verifyEIP712;
         i_owner = msg.sender;
@@ -173,13 +173,13 @@ contract ReportsManager {
             ipfsHash
         );
 
-        i_userProfile.updateLastReportId(ownerReport, reportId);
+        i_userProfiles.updateLastReportId(ownerReport, reportId);
 
         if (reportType == IUserProfiles.PreferredReportType.NFT) {
             i_reportNFT.mint(ownerReport, reportId, ipfsHash.hashDigest);
         }
 
-        emit ReportCreated(ownerReport, reportId, reportType, ipfsHash);
+        emit ReportCreated(reportId, ownerReport, reportType, ipfsHash);
 
         reportCount++;
     }
