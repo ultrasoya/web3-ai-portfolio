@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IUserProfile} from "./interfaces/IUserProfile.sol";
+import {IUserProfiles} from "./interfaces/IUserProfiles.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Structs} from "./shared/Structs.sol";
 

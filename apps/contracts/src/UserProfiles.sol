@@ -3,14 +3,14 @@
 pragma solidity ^0.8.30;
 
 /**
- * @title UserProfile
+ * @title UserProfiles
  * @author Your Name
  * @notice This contract manages user profiles for the Web3 AI Portfolio platform
  * @dev Allows users to register, update their preferences, and track their report history
  */
-contract UserProfile {
+contract UserProfiles {
     /**
-     * @notice User profile structure containing all user-related information
+     * @notice User profiles structure containing all user-related information
      * @param nickname Display name chosen by the user
      * @param registrationDate Unix timestamp when the user registered
      * @param preferredReportType User's preferred format for reports
@@ -19,7 +19,7 @@ contract UserProfile {
      */
     struct User {
         string nickname;
-        uint64 registrationDate;
+        uint40 registrationDate;
         PreferredReportType preferredReportType;
         FocusArea focusArea;
         uint lastReportId;
@@ -44,14 +44,17 @@ contract UserProfile {
         Portfolio
     }
 
-    /// @notice Address of the contract owner who can update report IDs
+    /// @notice Address of the contract owner
     address public immutable i_owner;
 
-    /// @notice Address of the report manager who can update user profiles
-    address public reportManager;
+    /// @notice Address of the report manager
+    address public immutable i_reportManager;
 
     /// @notice Mapping from user addresses to their profile information
     mapping(address => User) public users;
+
+    /// @notice Mapping from nickname to boolean to track taken nicknames
+    mapping(bytes32 => bool) public nicknames;
 
     /**
      * @notice Emitted when a new user registers
@@ -110,12 +113,21 @@ contract UserProfile {
     /// @notice Thrown when a non-authorized report manager tries to call an authorized report manager-only function
     error NotAuthorizedReportManager();
 
+    /// @notice Thrown when a nickname is already taken
+    error NicknameAlreadyTaken();
+
+    /// @notice Thrown when a non-user caller tries to call a user-only function
+    error NonUserCaller();
+
+    /// @notice Thrown when a nickname is empty
+    error EmptyNickname();
+
     /**
      * @notice Modifier that ensures only the report manager can call the function
      * @dev Reverts with NotAuthorizedReportManager if the caller is not the report manager
      */
     modifier onlyAuthorizedReportManager() {
-        if (msg.sender != reportManager) {
+        if (msg.sender != i_reportManager) {
             revert NotAuthorizedReportManager();
         }
         _;
@@ -144,22 +156,29 @@ contract UserProfile {
     }
 
     /**
-     * @notice Modifier that ensures only the contract owner can call the function
-     * @dev Reverts with NotOwner if the caller is not the owner
+     * @notice Modifier that ensures only unique nicknames can call the function
+     * @dev Reverts with NicknameAlreadyTaken if the nickname is already taken
      */
-    modifier onlyOwner() {
-        if (msg.sender != i_owner) {
-            revert NotOwner();
+    modifier onlyUniqueNickname(string memory nickname) {
+        if (nicknames[keccak256(bytes(nickname))]) {
+            revert NicknameAlreadyTaken();
+        }
+        _;
+    }
+
+    modifier onlyNonEmptyNickname(string memory nickname) {
+        if (keccak256(bytes(nickname)) == keccak256(bytes(""))) {
+            revert EmptyNickname();
         }
         _;
     }
 
     /**
-     * @notice Constructor that sets the contract owner to the deployer
-     * @dev The deployer becomes the owner and can update report IDs
+     * @notice Constructor that sets the report manager
+     * @dev The report manager can update report IDs
      */
-    constructor() {
-        i_owner = msg.sender;
+    constructor(address _reportManager) {
+        i_reportManager = _reportManager;
     }
 
     /**
@@ -174,14 +193,21 @@ contract UserProfile {
         string memory nickname,
         PreferredReportType preferredReportType,
         FocusArea focusArea
-    ) public onlyUnregisteredUser {
+    )
+        public
+        onlyUnregisteredUser
+        onlyUniqueNickname(nickname)
+        onlyNonEmptyNickname(nickname)
+    {
         users[msg.sender] = User(
             nickname,
-            uint64(block.timestamp),
+            uint40(block.timestamp),
             preferredReportType,
             focusArea,
-            0
+            0,
+            true
         );
+        nicknames[keccak256(bytes(nickname))] = true;
 
         emit UserRegistered(
             msg.sender,
@@ -221,7 +247,17 @@ contract UserProfile {
      * @dev Only registered users can call this function
      * @dev Emits NicknameUpdated event upon successful update
      */
-    function updateNickname(string memory nickname) public onlyRegisteredUser {
+    function updateNickname(
+        string memory nickname
+    )
+        public
+        onlyRegisteredUser
+        onlyUniqueNickname(nickname)
+        onlyNonEmptyNickname(nickname)
+    {
+        nicknames[keccak256(bytes(users[msg.sender].nickname))] = false;
+
+        nicknames[keccak256(bytes(nickname))] = true;
         users[msg.sender].nickname = nickname;
 
         emit NicknameUpdated(msg.sender, nickname);
@@ -259,13 +295,41 @@ contract UserProfile {
         emit LastReportIdUpdated(userAddress, lastReportId);
     }
 
-    function checkUserRegistered(
+    /**
+     * @notice Checks if a user is registered and active in the system
+     * @param userAddress Address of the user to check
+     * @return True if the user is registered (has isActive flag set to true), false otherwise
+     * @dev This is a view function that doesn't modify state
+     */
+    function checkUserRegisteredAndActive(
         address userAddress
     ) external view returns (bool) {
-        return users[userAddress].registrationDate != 0;
+        return users[userAddress].isActive;
     }
 
-    function setReportManager(address _reportManager) external onlyOwner {
-        reportManager = _reportManager;
+    /**
+     * @notice Deactivates a user account
+     * @param userAddress Address of the user to deactivate
+     * @dev Only registered users can call this function
+     * @dev Sets the user's isActive flag to false
+     */
+    function deactivateUser(address userAddress) public onlyRegisteredUser {
+        if (msg.sender != userAddress) {
+            revert NonUserCaller();
+        }
+        users[userAddress].isActive = false;
+    }
+
+    /**
+     * @notice Activates a user account
+     * @param userAddress Address of the user to activate
+     * @dev Only registered users can call this function
+     * @dev Sets the user's isActive flag to true
+     */
+    function activateUser(address userAddress) public onlyRegisteredUser {
+        if (msg.sender != userAddress) {
+            revert NonUserCaller();
+        }
+        users[userAddress].isActive = true;
     }
 }
