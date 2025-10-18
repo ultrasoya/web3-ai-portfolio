@@ -176,7 +176,7 @@ contract ReportsManager {
         i_userProfiles.updateLastReportId(ownerReport, reportId);
 
         if (reportType == IUserProfiles.PreferredReportType.NFT) {
-            i_reportNFT.mint(ownerReport, reportId, ipfsHash.hashDigest);
+            i_reportNFT.mint(ownerReport, reportId, ipfsHash);
         }
 
         emit ReportCreated(reportId, ownerReport, reportType, ipfsHash);
