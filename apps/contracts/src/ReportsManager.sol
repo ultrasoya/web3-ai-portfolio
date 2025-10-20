@@ -5,7 +5,6 @@ pragma solidity ^0.8.30;
 import {IUserProfiles} from "./interfaces/IUserProfiles.sol";
 import {IReportNFT} from "./interfaces/IReportNFT.sol";
 import {VerifyEIP712} from "./VerifyEIP712.sol";
-import {Structs} from "./shared/Structs.sol";
 
 /**
  * @title ReportsManager
@@ -19,13 +18,13 @@ contract ReportsManager {
      * @param ownerReport Address of the report owner
      * @param createdAt Unix timestamp when the report was created
      * @param reportType Type of the report (JSON, PDF, or NFT)
-     * @param ipfsHash IPFS hash information for the report content
+     * @param cid IPFS CID (Content Identifier) for the report content
      */
     struct Report {
         address ownerReport;
         uint64 createdAt;
         IUserProfiles.PreferredReportType reportType;
-        Structs.IpfsCID ipfsHash;
+        string cid;
     }
 
     /// @notice Address of the user profiles contract
@@ -54,13 +53,13 @@ contract ReportsManager {
      * @param reportId ID of the created report
      * @param ownerReport Address of the report owner
      * @param reportType Type of the created report
-     * @param ipfsHash IPFS hash of the report content
+     * @param cid IPFS CID of the report content
      */
     event ReportCreated(
         uint256 indexed reportId,
         address ownerReport,
         IUserProfiles.PreferredReportType reportType,
-        Structs.IpfsCID ipfsHash
+        string cid
     );
 
     /// @notice Thrown when an operation requires registration but user is not registered
@@ -145,7 +144,7 @@ contract ReportsManager {
 
         createReport(
             IUserProfiles.PreferredReportType(report.reportType),
-            report.ipfsHash,
+            report.cid,
             report.ownerReport
         );
     }
@@ -153,7 +152,7 @@ contract ReportsManager {
     /**
      * @notice Creates a new report without signature verification
      * @param reportType Type of the report to create (JSON, PDF, or NFT)
-     * @param ipfsHash IPFS hash information for the report content
+     * @param cid IPFS CID for the report content
      * @param ownerReport Address of the report owner
      * @dev Only registered users can have reports created for them
      * @dev Automatically mints an NFT if the report type is NFT
@@ -162,7 +161,7 @@ contract ReportsManager {
      */
     function createReport(
         IUserProfiles.PreferredReportType reportType,
-        Structs.IpfsCID calldata ipfsHash,
+        string calldata cid,
         address ownerReport
     ) public onlyRegisteredUser(ownerReport) {
         uint256 reportId = reportCount;
@@ -170,16 +169,16 @@ contract ReportsManager {
             ownerReport,
             uint64(block.timestamp),
             reportType,
-            ipfsHash
+            cid
         );
 
         i_userProfiles.updateLastReportId(ownerReport, reportId);
 
         if (reportType == IUserProfiles.PreferredReportType.NFT) {
-            i_reportNFT.mint(ownerReport, reportId, ipfsHash);
+            i_reportNFT.mint(ownerReport, reportId, cid);
         }
 
-        emit ReportCreated(reportId, ownerReport, reportType, ipfsHash);
+        emit ReportCreated(reportId, ownerReport, reportType, cid);
 
         reportCount++;
     }
