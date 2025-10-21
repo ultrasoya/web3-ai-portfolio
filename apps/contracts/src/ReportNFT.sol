@@ -42,6 +42,9 @@ contract ReportNFT is ERC721, Ownable {
     /// @notice Error thrown when caller is not the token owner
     error NotTokenOwner();
 
+    /// @notice Error thrown when token does not exist
+    error NotExistsToken();
+
     /**
      * @notice Modifier to restrict access to ReportManager only
      * @dev Checks that msg.sender == reportManager
@@ -61,6 +64,18 @@ contract ReportNFT is ERC721, Ownable {
     modifier onlyTokenOwner(uint256 tokenId) {
         if (ownerOf(tokenId) != msg.sender) {
             revert NotTokenOwner();
+        }
+        _;
+    }
+
+    /**
+     * @notice Modifier to restrict access to existing token only
+     * @dev Checks that the specified tokenId exists
+     * @param tokenId Token ID to check existence for
+     */
+    modifier onlyExistsToken(uint256 tokenId) {
+        if (ownerOf(tokenId) == address(0)) {
+            revert NotExistsToken();
         }
         _;
     }
@@ -139,7 +154,7 @@ contract ReportNFT is ERC721, Ownable {
      */
     function tokenURI(
         uint256 tokenId
-    ) public view override returns (string memory) {
+    ) public view override onlyExistsToken(tokenId) returns (string memory) {
         return
             string.concat(baseTokenURI, tokenToCID[tokenId], "/metadata.json");
     }

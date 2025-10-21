@@ -13,6 +13,7 @@ interface IReportNFT {
 
     error NotReportManager();
     error NotTokenOwner();
+    error NotExistsToken();
 
     function mint(
         address mintOwner,
