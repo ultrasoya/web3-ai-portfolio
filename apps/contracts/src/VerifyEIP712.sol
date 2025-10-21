@@ -37,6 +37,12 @@ contract VerifyEIP712 is EIP712 {
             );
     }
 
+    function getTypedDataHash(
+        Report calldata report
+    ) external view returns (bytes32) {
+        return _hashTypedDataV4(_hashReport(report));
+    }
+
     function verify(
         Report calldata report,
         bytes calldata signature,
