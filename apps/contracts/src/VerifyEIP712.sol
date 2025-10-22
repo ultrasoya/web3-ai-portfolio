@@ -22,9 +22,18 @@ contract VerifyEIP712 is EIP712 {
 
     constructor() EIP712("ReportCreator", "1") {}
 
+    error EmptyCid();
+
+    modifier notEmptyCid(string memory cid) {
+        if (bytes(cid).length == 0) {
+            revert EmptyCid();
+        }
+        _;
+    }
+
     function _hashReport(
         Report calldata report
-    ) internal pure returns (bytes32) {
+    ) internal view notEmptyCid(report.cid) returns (bytes32) {
         return
             keccak256(
                 abi.encode(
