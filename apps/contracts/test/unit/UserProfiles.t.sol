@@ -238,4 +238,108 @@ contract UserProfilesTest is Test {
         );
         vm.stopPrank();
     }
+
+    function testUserUpdateNickname() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        userProfiles.updateNickname("Jane Doe");
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        assertEq(userProfile.nickname, "Jane Doe");
+    }
+
+    function testUserUpdateNicknameEvent() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        vm.expectEmit(true, true, true, true);
+        emit UserProfiles.NicknameUpdated(user, "Jane Doe");
+        userProfiles.updateNickname("Jane Doe");
+        vm.stopPrank();
+    }
+
+    function testFreeOldNickname() public {
+        address user2 = makeAddr("user2");
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+
+        userProfiles.updateNickname("Jane Doe");
+        vm.stopPrank();
+
+        assertEq(userProfiles.nicknames("John Doe"), false);
+
+        vm.startPrank(user2);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        UserProfiles.User memory userProfile2 = userProfiles.getUser(user2);
+
+        assertEq(userProfile.nickname, "Jane Doe");
+        assertEq(userProfile2.nickname, "John Doe");
+    }
+
+    function testUpdateNonUniqueNickname() public {
+        address user2 = makeAddr("user2");
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(user2);
+        vm.expectRevert(UserProfiles.NicknameAlreadyTaken.selector);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+    }
+
+    function testUpdateEmptyNickname() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.EmptyNickname.selector);
+        userProfiles.updateNickname("");
+        vm.stopPrank();
+    }
+
+    function testNonRegisteredUserCannotUpdateNickname() public {
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.updateNickname("Jane Doe");
+        vm.stopPrank();
+    }
 }
