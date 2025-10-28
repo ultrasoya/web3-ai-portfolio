@@ -10,11 +10,13 @@ contract UserProfilesTest is Test {
     UserProfiles public userProfiles;
     address public reportsManager;
     address public user;
+    address public reportManager;
 
     function setUp() public {
         reportsManager = makeAddr("reportManager");
         userProfiles = new UserProfiles(reportsManager);
         user = makeAddr("user");
+        reportManager = makeAddr("reportManager");
     }
 
     function testRegisterUser() public {
@@ -340,6 +342,148 @@ contract UserProfilesTest is Test {
         vm.startPrank(user);
         vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
         userProfiles.updateNickname("Jane Doe");
+        vm.stopPrank();
+    }
+
+    function testUpdateFocusArea() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        userProfiles.updateFocusArea(UserProfiles.FocusArea.NFT);
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        assertEq(
+            uint8(userProfile.focusArea),
+            uint8(UserProfiles.FocusArea.NFT)
+        );
+    }
+
+    function testUpdateFocusAreaEvent() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        vm.expectEmit(true, true, true, true);
+        emit UserProfiles.FocusAreaUpdated(user, UserProfiles.FocusArea.NFT);
+        userProfiles.updateFocusArea(UserProfiles.FocusArea.NFT);
+        vm.stopPrank();
+    }
+
+    function testNonRegisteredUserCannotUpdateFocusArea() public {
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.updateFocusArea(UserProfiles.FocusArea.NFT);
+        vm.stopPrank();
+    }
+
+    function testNonActiveUserCannotUpdateFocusArea() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.updateFocusArea(UserProfiles.FocusArea.NFT);
+        vm.stopPrank();
+    }
+
+    function testUpdateFocusAreaToAllEnumValues() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+
+        vm.stopPrank();
+
+        for (uint256 i = 0; i < 4; i++) {
+            vm.startPrank(user);
+            userProfiles.updateFocusArea(UserProfiles.FocusArea(i));
+            vm.stopPrank();
+
+            UserProfiles.User memory userProfile = userProfiles.getUser(user);
+            assertEq(uint8(userProfile.focusArea), i);
+        }
+    }
+
+    function testUpdateLastReportId() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(reportManager);
+        userProfiles.updateLastReportId(user, 1);
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        assertEq(userProfile.lastReportId, 1);
+    }
+
+    function testUpdateLastReportIdEvent() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+
+        vm.startPrank(reportManager);
+        vm.expectEmit(true, true, true, true);
+        emit UserProfiles.LastReportIdUpdated(user, 1);
+        userProfiles.updateLastReportId(user, 1);
+        vm.stopPrank();
+    }
+
+    function testNonReportManagerCannotUpdateLastReportId() public {
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotAuthorizedReportManager.selector);
+        userProfiles.updateLastReportId(user, 1);
+        vm.stopPrank();
+    }
+
+    function testUpdateLastReportIdForNonActiveUser() public {
+        vm.startPrank(user);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        vm.startPrank(reportManager);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.updateLastReportId(user, 1);
+        vm.stopPrank();
+    }
+
+    function testUpdateLastReportIdForNonRegisteredUser() public {
+        vm.startPrank(reportManager);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.updateLastReportId(user, 1);
         vm.stopPrank();
     }
 }
