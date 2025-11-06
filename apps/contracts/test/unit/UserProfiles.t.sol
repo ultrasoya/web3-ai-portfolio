@@ -19,14 +19,40 @@ contract UserProfilesTest is Test {
         reportManager = makeAddr("reportManager");
     }
 
-    function testRegisterUser() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
+    function _registerUser(
+        address userAddress,
+        string memory nickname,
+        UserProfiles.PreferredReportType preferredReportType,
+        UserProfiles.FocusArea focusArea
+    ) internal {
+        vm.startPrank(userAddress);
+        userProfiles.registerUser(nickname, preferredReportType, focusArea);
+        vm.stopPrank();
+    }
+
+    function _registerUser(address userAddress) internal {
+        _registerUser(
+            userAddress,
             "John Doe",
             UserProfiles.PreferredReportType.JSON,
             UserProfiles.FocusArea.DeFi
         );
-        vm.stopPrank();
+    }
+
+    function _registerUser(
+        address userAddress,
+        string memory nickname
+    ) internal {
+        _registerUser(
+            userAddress,
+            nickname,
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+    }
+
+    function testRegisterUser() public {
+        _registerUser(user);
 
         UserProfiles.User memory userProfile = userProfiles.getUser(user);
 
@@ -59,13 +85,7 @@ contract UserProfilesTest is Test {
     }
 
     function testAlreadyRegisteredUser() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         vm.expectRevert(UserProfiles.AlreadyRegistered.selector);
@@ -89,14 +109,11 @@ contract UserProfilesTest is Test {
     }
 
     function testNicknameAlreadyTaken() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
+        _registerUser(user);
 
+        vm.startPrank(user);
         userProfiles.deactivateUser(user);
+        vm.stopPrank();
 
         vm.expectRevert(UserProfiles.NicknameAlreadyTaken.selector);
         userProfiles.registerUser(
@@ -109,39 +126,21 @@ contract UserProfilesTest is Test {
 
     function testRightTimestampIsSet() public {
         uint256 timestamp = block.timestamp;
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         UserProfiles.User memory userProfile = userProfiles.getUser(user);
         assertEq(userProfile.registrationDate, timestamp);
     }
 
     function testRegisteredUserHasActiveStatus() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         bool isActive = userProfiles.checkUserRegisteredAndActive(user);
         assertTrue(isActive);
     }
 
     function testUserDataIsValid() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         UserProfiles.User memory userProfile = userProfiles.getUser(user);
         assertEq(userProfile.nickname, "John Doe");
@@ -173,13 +172,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUserUpdatePreferredReportType() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         userProfiles.updatePreferredReportType(
@@ -195,13 +188,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUserUpdatePreferredReportTypeEvent() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         vm.expectEmit(true, true, true, true);
@@ -225,14 +212,11 @@ contract UserProfilesTest is Test {
     }
 
     function testNonActiveUserCannotUpdatePreferredReportType() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
+        _registerUser(user);
 
+        vm.startPrank(user);
         userProfiles.deactivateUser(user);
+        vm.stopPrank();
 
         vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
         userProfiles.updatePreferredReportType(
@@ -242,13 +226,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUserUpdateNickname() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         userProfiles.updateNickname("Jane Doe");
@@ -259,13 +237,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUserUpdateNicknameEvent() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         vm.expectEmit(true, true, true, true);
@@ -276,25 +248,15 @@ contract UserProfilesTest is Test {
 
     function testFreeOldNickname() public {
         address user2 = makeAddr("user2");
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
+        _registerUser(user);
 
+        vm.startPrank(user);
         userProfiles.updateNickname("Jane Doe");
         vm.stopPrank();
 
         assertEq(userProfiles.nicknames("John Doe"), false);
 
-        vm.startPrank(user2);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user2);
 
         UserProfiles.User memory userProfile = userProfiles.getUser(user);
         UserProfiles.User memory userProfile2 = userProfiles.getUser(user2);
@@ -305,13 +267,7 @@ contract UserProfilesTest is Test {
 
     function testUpdateNonUniqueNickname() public {
         address user2 = makeAddr("user2");
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user2);
         vm.expectRevert(UserProfiles.NicknameAlreadyTaken.selector);
@@ -324,13 +280,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateEmptyNickname() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         vm.expectRevert(UserProfiles.EmptyNickname.selector);
@@ -346,13 +296,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateFocusArea() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         userProfiles.updateFocusArea(UserProfiles.FocusArea.NFT);
@@ -366,13 +310,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateFocusAreaEvent() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(user);
         vm.expectEmit(true, true, true, true);
@@ -389,12 +327,9 @@ contract UserProfilesTest is Test {
     }
 
     function testNonActiveUserCannotUpdateFocusArea() public {
+        _registerUser(user);
+
         vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
         userProfiles.deactivateUser(user);
         vm.stopPrank();
 
@@ -405,14 +340,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateFocusAreaToAllEnumValues() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-
-        vm.stopPrank();
+        _registerUser(user);
 
         for (uint256 i = 0; i < 4; i++) {
             vm.startPrank(user);
@@ -425,13 +353,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateLastReportId() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(reportManager);
         userProfiles.updateLastReportId(user, 1);
@@ -442,13 +364,7 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateLastReportIdEvent() public {
-        vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
-        vm.stopPrank();
+        _registerUser(user);
 
         vm.startPrank(reportManager);
         vm.expectEmit(true, true, true, true);
@@ -465,12 +381,9 @@ contract UserProfilesTest is Test {
     }
 
     function testUpdateLastReportIdForNonActiveUser() public {
+        _registerUser(user);
+
         vm.startPrank(user);
-        userProfiles.registerUser(
-            "John Doe",
-            UserProfiles.PreferredReportType.JSON,
-            UserProfiles.FocusArea.DeFi
-        );
         userProfiles.deactivateUser(user);
         vm.stopPrank();
 
@@ -484,6 +397,249 @@ contract UserProfilesTest is Test {
         vm.startPrank(reportManager);
         vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
         userProfiles.updateLastReportId(user, 1);
+        vm.stopPrank();
+    }
+
+    function testDeactivateUser() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        assertFalse(userProfile.isActive);
+    }
+
+    function testDeactivateUserCannotUpdateProfile() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.updatePreferredReportType(
+            UserProfiles.PreferredReportType.NFT
+        );
+        vm.stopPrank();
+    }
+
+    function testCannotDeactivateAnotherUser() public {
+        _registerUser(user);
+        address user2 = makeAddr("user2");
+        _registerUser(user2, "Jane Doe");
+
+        vm.startPrank(user2);
+        vm.expectRevert(UserProfiles.NonSelfCaller.selector);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+    }
+
+    function testDeactiveAlreadyDeactivatedUser() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+    }
+
+    function testNonRegisteredUserCannotDeactivateUser() public {
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotRegisteredOrActive.selector);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+    }
+
+    function testActivateUser() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        userProfiles.activateUser(user);
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        assertTrue(userProfile.isActive);
+    }
+
+    function testCannotActivateAnotherUser() public {
+        _registerUser(user);
+        address user2 = makeAddr("user2");
+        _registerUser(user2, "Jane Doe");
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        vm.startPrank(user2);
+        vm.expectRevert(UserProfiles.NonSelfCaller.selector);
+        userProfiles.activateUser(user);
+        vm.stopPrank();
+    }
+
+    function testActivateAlreadyActivatedUser() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotDeactivated.selector);
+        userProfiles.activateUser(user);
+        vm.stopPrank();
+    }
+
+    function testCheckUserRegisteredAndActiveTrue() public {
+        _registerUser(user);
+
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user));
+    }
+
+    function testCheckUserRegisteredAndActiveFalseForNonActiveUser() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        assertFalse(userProfiles.checkUserRegisteredAndActive(user));
+    }
+
+    function testCheckUserRegisteredAndActiveFalseForNonRegisteredUser()
+        public
+        view
+    {
+        assertFalse(userProfiles.checkUserRegisteredAndActive(user));
+    }
+
+    function testMultipleUsersCanRegister() public {
+        address user2 = makeAddr("user2");
+        address user3 = makeAddr("user3");
+        address user4 = makeAddr("user4");
+        address user5 = makeAddr("user5");
+        address user6 = makeAddr("user6");
+        address user7 = makeAddr("user7");
+        address user8 = makeAddr("user8");
+        address user9 = makeAddr("user9");
+        address user10 = makeAddr("user10");
+
+        _registerUser(user2, "Jane Doe");
+        _registerUser(user3, "Doe Doe");
+        _registerUser(user4, "Charlie Doe");
+        _registerUser(user5, "David Doe");
+        _registerUser(user6, "Eve Doe");
+        _registerUser(user7, "Frank Doe");
+        _registerUser(user8, "George Doe");
+        _registerUser(user9, "Hannah Doe");
+        _registerUser(user10, "Isaac Doe");
+
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user2));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user3));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user4));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user5));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user6));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user7));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user8));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user9));
+        assertTrue(userProfiles.checkUserRegisteredAndActive(user10));
+    }
+
+    function testNultipleUsersCanHaveSamePreferences() public {
+        address user2 = makeAddr("user2");
+        address user3 = makeAddr("user3");
+        address user4 = makeAddr("user4");
+        address user5 = makeAddr("user5");
+        address user6 = makeAddr("user6");
+        address user7 = makeAddr("user7");
+        address user8 = makeAddr("user8");
+        address user9 = makeAddr("user9");
+        address user10 = makeAddr("user10");
+
+        _registerUser(user2, "Jane Doe");
+        _registerUser(user3, "Doe Doe");
+        _registerUser(user4, "Charlie Doe");
+        _registerUser(user5, "David Doe");
+        _registerUser(user6, "Eve Doe");
+        _registerUser(user7, "Frank Doe");
+        _registerUser(user8, "George Doe");
+        _registerUser(user9, "Hannah Doe");
+        _registerUser(user10, "Isaac Doe");
+
+        assertEq(
+            uint8(userProfiles.getUser(user2).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user3).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user4).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user5).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user6).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user7).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user8).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user9).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+        assertEq(
+            uint8(userProfiles.getUser(user10).preferredReportType),
+            uint8(UserProfiles.PreferredReportType.JSON)
+        );
+    }
+
+    function testUserCannotTakeDeactivatedNickname() public {
+        _registerUser(user);
+
+        vm.startPrank(user);
+        userProfiles.deactivateUser(user);
+        vm.stopPrank();
+
+        vm.expectRevert(UserProfiles.NicknameAlreadyTaken.selector);
+        userProfiles.registerUser(
+            "John Doe",
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+    }
+
+    function testRegisterWithVeryLongNickname() public {
+        bytes memory packed = abi.encodePacked(
+            "0123456789",
+            "0123456789",
+            "0123456789",
+            "0123456789",
+            "0123456789"
+        );
+        string memory nickname = string(packed);
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NicknameTooLong.selector);
+        userProfiles.registerUser(
+            nickname,
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
         vm.stopPrank();
     }
 }

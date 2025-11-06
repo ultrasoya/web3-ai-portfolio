@@ -122,6 +122,26 @@ contract UserProfiles {
     /// @notice Thrown when a nickname is empty
     error EmptyNickname();
 
+    /// @notice Thrown when an operation requires deactivation but user is not deactivated
+    error NotDeactivated();
+
+    /// @notice Thrown when a non-self caller tries to call a self-only function
+    error NonSelfCaller();
+
+    /// @notice Thrown when a nickname is too long
+    error NicknameTooLong();
+
+    /**
+     * @notice Modifier that ensures only the self caller can call the function
+     * @dev Reverts with NonSelfCaller if the caller is not the self
+     */
+    modifier onlySelfCaller(address userAddress) {
+        if (msg.sender != userAddress) {
+            revert NonSelfCaller();
+        }
+        _;
+    }
+
     /**
      * @notice Modifier that ensures only the report manager can call the function
      * @dev Reverts with NotAuthorizedReportManager if the caller is not the report manager
@@ -129,6 +149,17 @@ contract UserProfiles {
     modifier onlyAuthorizedReportManager() {
         if (msg.sender != i_reportManager) {
             revert NotAuthorizedReportManager();
+        }
+        _;
+    }
+
+    /**
+     * @notice Modifier that ensures only registered users can call the function
+     * @dev Reverts with NotDeactivated if the user is not deactivated
+     */
+    modifier onlyDeactivatedUser() {
+        if (users[msg.sender].isActive) {
+            revert NotDeactivated();
         }
         _;
     }
@@ -166,9 +197,24 @@ contract UserProfiles {
         _;
     }
 
+    /**
+     * @notice Modifier that ensures only non-empty nicknames can call the function
+     * @dev Reverts with EmptyNickname if the nickname is empty
+     */
     modifier onlyNonEmptyNickname(string memory nickname) {
         if (keccak256(bytes(nickname)) == keccak256(bytes(""))) {
             revert EmptyNickname();
+        }
+        _;
+    }
+
+    /**
+     * @notice Modifier that ensures only nicknames with length less than 32 can call the function
+     * @dev Reverts with NicknameTooLong if the nickname is longer than 32 characters
+     */
+    modifier onlyNicknameLengthLessThan32(string memory nickname) {
+        if (bytes(nickname).length > 32) {
+            revert NicknameTooLong();
         }
         _;
     }
@@ -198,6 +244,7 @@ contract UserProfiles {
         onlyUnregisteredUser
         onlyUniqueNickname(nickname)
         onlyNonEmptyNickname(nickname)
+        onlyNicknameLengthLessThan32(nickname)
     {
         users[msg.sender] = User(
             nickname,
@@ -254,6 +301,7 @@ contract UserProfiles {
         onlyRegisteredAndActiveUser
         onlyUniqueNickname(nickname)
         onlyNonEmptyNickname(nickname)
+        onlyNicknameLengthLessThan32(nickname)
     {
         nicknames[keccak256(bytes(users[msg.sender].nickname))] = false;
 
@@ -317,25 +365,19 @@ contract UserProfiles {
      */
     function deactivateUser(
         address userAddress
-    ) public onlyRegisteredAndActiveUser {
-        if (msg.sender != userAddress) {
-            revert NonUserCaller();
-        }
+    ) public onlySelfCaller(userAddress) onlyRegisteredAndActiveUser {
         users[userAddress].isActive = false;
     }
 
     /**
      * @notice Activates a user account
      * @param userAddress Address of the user to activate
-     * @dev Only registered users can call this function
+     * @dev Only deactivated users can call this function
      * @dev Sets the user's isActive flag to true
      */
     function activateUser(
         address userAddress
-    ) public onlyRegisteredAndActiveUser {
-        if (msg.sender != userAddress) {
-            revert NonUserCaller();
-        }
+    ) public onlySelfCaller(userAddress) onlyDeactivatedUser {
         users[userAddress].isActive = true;
     }
 }
