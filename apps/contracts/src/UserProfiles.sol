@@ -131,6 +131,9 @@ contract UserProfiles {
     /// @notice Thrown when a nickname is too long
     error NicknameTooLong();
 
+    /// @notice Thrown when a nickname is not alpha-numeric
+    error NotAlphaNumericNickname();
+
     /**
      * @notice Modifier that ensures only the self caller can call the function
      * @dev Reverts with NonSelfCaller if the caller is not the self
@@ -220,6 +223,36 @@ contract UserProfiles {
     }
 
     /**
+     * @notice Modifier that ensures only alpha-numeric nicknames can call the function
+     * @dev Reverts with NotAlphaNumericNickname if the nickname is not alpha-numeric
+     */
+    modifier onlyAlphaNumericNickname(string memory nickname) {
+        if (!isAlphaNumeric(nickname)) {
+            revert NotAlphaNumericNickname();
+        }
+        _;
+    }
+
+    function isAlphaNumeric(
+        string memory nickname
+    ) internal pure returns (bool) {
+        for (uint256 i = 0; i < bytes(nickname).length; i++) {
+            if (!isAlphaNumericChar(bytes(nickname)[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function isAlphaNumericChar(bytes1 char) internal pure returns (bool) {
+        return
+            (char >= 0x61 && char <= 0x7A) || // a-z
+            (char >= 0x41 && char <= 0x5A) || // A-Z
+            (char >= 0x30 && char <= 0x39) || // 0-9
+            (char == 0x20); // space
+    }
+
+    /**
      * @notice Constructor that sets the report manager
      * @dev The report manager can update report IDs
      */
@@ -245,6 +278,7 @@ contract UserProfiles {
         onlyUniqueNickname(nickname)
         onlyNonEmptyNickname(nickname)
         onlyNicknameLengthLessThan32(nickname)
+        onlyAlphaNumericNickname(nickname)
     {
         users[msg.sender] = User(
             nickname,
@@ -302,6 +336,7 @@ contract UserProfiles {
         onlyUniqueNickname(nickname)
         onlyNonEmptyNickname(nickname)
         onlyNicknameLengthLessThan32(nickname)
+        onlyAlphaNumericNickname(nickname)
     {
         nicknames[keccak256(bytes(users[msg.sender].nickname))] = false;
 

@@ -642,4 +642,41 @@ contract UserProfilesTest is Test {
         );
         vm.stopPrank();
     }
+
+    function testRegisterWithSpecialCharactersNickname() public {
+        string memory nickname = "John Doe!@#$%^&*()";
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotAlphaNumericNickname.selector);
+        userProfiles.registerUser(
+            nickname,
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+    }
+
+    function testRegisterWithUnicodeNickname() public {
+        string memory nickname = unicode"John Doe 🚀";
+
+        vm.startPrank(user);
+        vm.expectRevert(UserProfiles.NotAlphaNumericNickname.selector);
+        userProfiles.registerUser(
+            nickname,
+            UserProfiles.PreferredReportType.JSON,
+            UserProfiles.FocusArea.DeFi
+        );
+        vm.stopPrank();
+    }
+
+    function testMaxValueForLastReportId() public {
+        _registerUser(user);
+
+        vm.startPrank(reportManager);
+        userProfiles.updateLastReportId(user, type(uint256).max);
+        vm.stopPrank();
+
+        UserProfiles.User memory userProfile = userProfiles.getUser(user);
+        assertEq(userProfile.lastReportId, type(uint256).max);
+    }
 }
