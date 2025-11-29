@@ -28,10 +28,10 @@ contract ReportsManager {
     }
 
     /// @notice Address of the user profiles contract
-    IUserProfiles immutable i_userProfiles;
+    IUserProfiles public s_userProfiles;
 
     /// @notice Address of the report NFT contract
-    IReportNFT immutable i_reportNFT;
+    IReportNFT public s_reportNFT;
 
     /// @notice Address of the EIP-712 verification contract
     VerifyEIP712 immutable i_verifyEIP712;
@@ -48,6 +48,9 @@ contract ReportsManager {
     /// @notice Total number of reports created
     uint256 public reportCount = 1;
 
+    /// @notice Flag to check if the contract is initialized
+    bool private s_initialized = false;
+
     /**
      * @notice Emitted when a new report is created
      * @param reportId ID of the created report
@@ -62,6 +65,11 @@ contract ReportsManager {
         string cid
     );
 
+    /**
+     * @notice Emitted when the contract is initialized
+     */
+    event ContractInitialized();
+
     /// @notice Thrown when an operation requires registration but user is not registered
     error NotRegistered();
 
@@ -73,6 +81,12 @@ contract ReportsManager {
 
     /// @notice Thrown when a non-owner tries to call an owner-only function
     error NotOwner();
+
+    /// @notice Thrown when the contract is already initialized
+    error AlreadyInitialized();
+
+    /// @notice Thrown when the user profiles or report NFT address is invalid
+    error InvalidUserProfilesOrReportNFT();
 
     /**
      * @notice Modifier that ensures only the contract owner can call the function
@@ -102,7 +116,7 @@ contract ReportsManager {
      * @dev Reverts with NotRegistered if the user is not registered
      */
     modifier onlyRegisteredUser(address ownerReport) {
-        if (!i_userProfiles.checkUserRegisteredAndActive(ownerReport)) {
+        if (!s_userProfiles.checkUserRegisteredAndActive(ownerReport)) {
             revert NotRegistered();
         }
         _;
@@ -120,8 +134,8 @@ contract ReportsManager {
         IReportNFT _reportNFT,
         VerifyEIP712 _verifyEIP712
     ) {
-        i_userProfiles = IUserProfiles(_userProfiles);
-        i_reportNFT = IReportNFT(_reportNFT);
+        s_userProfiles = IUserProfiles(_userProfiles);
+        s_reportNFT = IReportNFT(_reportNFT);
         i_verifyEIP712 = _verifyEIP712;
         i_owner = msg.sender;
     }
@@ -172,10 +186,10 @@ contract ReportsManager {
             cid
         );
 
-        i_userProfiles.updateLastReportId(ownerReport, reportId);
+        s_userProfiles.updateLastReportId(ownerReport, reportId);
 
         if (reportType == IUserProfiles.PreferredReportType.NFT) {
-            i_reportNFT.mint(ownerReport, reportId, cid);
+            s_reportNFT.mint(ownerReport, reportId, cid);
         }
 
         emit ReportCreated(reportId, ownerReport, reportType, cid);
@@ -183,6 +197,29 @@ contract ReportsManager {
         reportCount++;
     }
 
+    /**
+     * @notice Initializes the contract
+     * @dev Only the contract owner can call this function
+     */
+    function initialize(
+        IUserProfiles _userProfiles,
+        IReportNFT _reportNFT
+    ) external onlyOwner {
+        if (s_initialized) {
+            revert AlreadyInitialized();
+        }
+        if (
+            address(_userProfiles) == address(0) ||
+            address(_reportNFT) == address(0)
+        ) {
+            revert InvalidUserProfilesOrReportNFT();
+        }
+        s_userProfiles = _userProfiles;
+        s_reportNFT = _reportNFT;
+        s_initialized = true;
+
+        emit ContractInitialized();
+    }
     /**
      * @notice Adds a backend address to the list of authorized backends
      * @param backend Address of the backend to authorize

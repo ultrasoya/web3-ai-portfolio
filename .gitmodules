@@ -1,3 +1,9 @@
 [submodule "apps/contracts/lib/chainlink"]
 	path = apps/contracts/lib/chainlink
 	url = https://github.com/smartcontractkit/chainlink
+[submodule "lib/chainlink-brownie-contracts"]
+	path = lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
+[submodule "apps/contracts/lib/chainlink-brownie-contracts"]
+	path = apps/contracts/lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts

@@ -57,9 +57,7 @@ contract VerifyEIP712 is EIP712 {
         bytes calldata signature,
         address expectedSigner
     ) external view returns (bool) {
-        // digest по EIP-712
         bytes32 digest = _hashTypedDataV4(_hashReport(report));
-        // восстанавливаем адрес подписанта
         address signer = ECDSA.recover(digest, signature);
         return signer == expectedSigner;
     }
